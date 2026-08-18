@@ -1,0 +1,45 @@
+name: ${COMPOSE_PROJECT_NAME:-canil-prefeitura}
+
+services:
+  frontend:
+    image: ${REGISTRY:-canil-prefeitura}/frontend:${IMAGE_TAG:-latest}
+    build:
+      context: ../..
+      dockerfile: support/docker/frontend.Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backend:
+    image: ${REGISTRY:-canil-prefeitura}/backend:${IMAGE_TAG:-latest}
+    build:
+      context: ../..
+      dockerfile: support/docker/backend.Dockerfile
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-canil}:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-canil}?schema=public
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-canil}
+      POSTGRES_USER: ${POSTGRES_USER:-canil}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
